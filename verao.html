@@ -1,0 +1,182 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document</title>
+</head>
+<style>
+    /* Container do banner */
+    .hero-banner {
+        position: relative;
+        width: 100%;
+        /* opcional: evita “pulo” de layout antes da imagem carregar */
+        /* aspect-ratio: 16 / 9;  */
+    }
+
+    /* Imagem responsiva: width 100% e height auto (como solicitado) */
+    .hero-img {
+        display: block;
+        width: 100%;
+        height: auto;
+        /* mantém proporção */
+    }
+
+    /* Camada do contador (fica por cima da imagem) */
+    .contador {
+        position: absolute;
+        inset: auto auto auto auto;
+        /* reset */
+        /* Posição “base” do bloco do contador dentro do banner
+     Ajuste as variáveis abaixo para encaixar na área desejada do seu banner */
+        --contador-top: 23%;
+        /* % do alto da imagem */
+        --contador-left: 82.6%;
+        /* % da esquerda da imagem */
+        --contador-translate-x: -50%;
+        --contador-translate-y: -50%;
+
+        top: var(--contador-top);
+        left: var(--contador-left);
+        transform: translate(var(--contador-translate-x), var(--contador-translate-y));
+        display: inline-flex;
+        align-items: center;
+        gap: 2.7em;
+        padding: 0.25em 0.4em;
+        /* Ajuste de tipografia responsiva */
+        font-size: clamp(22px, 4vw, 60px);
+        font-weight: 800;
+        line-height: 1;
+        color: #ffffff;
+        /* Caso o banner seja clicável/linkado, o contador não bloqueia clique */
+        pointer-events: none;
+        z-index: 1;
+    }
+
+    /* Estilo dos números e separador */
+    .contador .numero {
+        font-variant-numeric: tabular-nums;
+        letter-spacing: .02em;
+    }
+
+    .contador .sep {
+        font-weight: 700;
+        opacity: .9;
+        margin: 0 .15em;
+    }
+
+    /*Esse elemento já existe, tem que ajutar o tamanho
+    E tem que tirar o bg-color também não precisa desse sobrepondo os styles existentes*/
+    .numero {
+        font-size: 1.4em !important;
+        background-color: transparent !important;
+    }
+
+    /* Base (≥ 1900px) */
+    .hero-banner .contador {
+        gap: 2.7em;
+    }
+
+    @media (max-width: 767px) {
+
+        /* Camada do contador (fica por cima da imagem) */
+        .contador {
+            --contador-top: 73%;
+            /* % do alto da imagem */
+            --contador-left: 67.9%;
+            /* Ajuste de tipografia responsiva */
+            font-size: clamp(22px, 4vw, 60px);
+        }
+    }
+</style>
+
+<body>
+    <section class="hero-banner" aria-label="Contagem regressiva do evento">
+        <picture class="hero-media">
+            <!-- Substitua o srcset abaixo pelo banner MOBILE -->
+            <source media="(max-width: 767px)"
+                srcset="https://www.parana.pr.gov.br/sites/default/arquivos_restritos/files/imagem/2025-10/verao_maior_banner_mobile.png">
+            <!-- Banner DESKTOP (default) -->
+            <img class="hero-img"
+                src="https://www.parana.pr.gov.br/sites/default/arquivos_restritos/files/imagem/2025-10/banner-verao.png"
+                alt="" width="1920" height="auto" loading="eager">
+        </picture>
+
+        <!-- CONTADOR SOBRE O BANNER -->
+        <div class="contador" aria-live="polite">
+            <span class="numero" id="dia">64</span>
+
+            <span class="numero" id="hora">12</span>
+
+            <span class="numero" id="minuto">21</span>
+        </div>
+    </section>
+</body>
+<script>
+    (function () {
+        const contador = document.querySelector('.contador');
+        if (!contador) return;
+
+        // ===== Segmentos de largura (px) com alvos de gap (em) e fonte (px) =====
+        const SEGMENTS = [
+            { min: 320, max: 480, gapMin: 1.30, gapMax: 2.05, fontMin: 18, fontMax: 22 },  // mobile pequeno
+            { min: 481, max: 767, gapMin: 1.70, gapMax: 2.00, fontMin: 25, fontMax: 35 },  // mobile grande
+            { min: 768, max: 1023, gapMin: 1.37, gapMax: 1.60, fontMin: 25, fontMax: 30 },  // tablet
+            { min: 1024, max: 1279, gapMin: 1.50, gapMax: 1.75, fontMin: 31, fontMax: 36 },  // desktop pequeno
+            { min: 1280, max: 1439, gapMin: 1.65, gapMax: 1.70, fontMin: 37, fontMax: 43 },  // 1280~1440
+            { min: 1440, max: 1599, gapMin: 1.60, gapMax: 1.65, fontMin: 43, fontMax: 49 },  // 1440~1600
+            { min: 1600, max: 1919, gapMin: 1.70, gapMax: 1.85, fontMin: 49, fontMax: 53 },  // 1600~1920-
+            { min: 1920, max: 9999, gapMin: 1.85, gapMax: 13.60, fontMin: 53, fontMax: 60 },  // 1920+
+        ];
+
+        const GAP_SCALE = 1.2;
+
+        const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+        const lerp = (a, b, t) => a + (b - a) * t;
+
+        function pickSegment(w) {
+            for (const s of SEGMENTS) {
+                if (w >= s.min && w <= s.max) return s;
+            }
+            return w < SEGMENTS[0].min ? SEGMENTS[0] : SEGMENTS[SEGMENTS.length - 1];
+        }
+
+        function computeStyles(w) {
+            const s = pickSegment(w);
+            const span = Math.max(1, s.max - s.min);
+            const t = clamp((w - s.min) / span, 0, 1);
+
+            const gap = lerp(s.gapMin, s.gapMax, t) * GAP_SCALE; // aplica o aperto global
+            const font = lerp(s.fontMin, s.fontMax, t);
+
+            return { gap, font };
+        }
+
+        function apply() {
+            const w = window.innerWidth;
+            const { gap, font } = computeStyles(w);
+
+            contador.style.gap = gap.toFixed(3) + 'em';
+            // Ajusta a fonte do container; os .numero em 1.4em escalam juntos
+            contador.style.fontSize = font.toFixed(2) + 'px';
+        }
+
+        let raf = null;
+        const onResize = () => {
+            if (raf) cancelAnimationFrame(raf);
+            raf = requestAnimationFrame(apply);
+        };
+
+        window.addEventListener('resize', onResize, { passive: true });
+        window.addEventListener('orientationchange', onResize, { passive: true });
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', apply, { once: true });
+        } else {
+            apply();
+        }
+    })();
+</script>
+
+</html>
